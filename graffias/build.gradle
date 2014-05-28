@@ -1,0 +1,14 @@
+apply plugin: 'groovy'
+apply plugin: 'application'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.2.2'
+}
+
+run {
+    main = 'graffias.Main'
+}
