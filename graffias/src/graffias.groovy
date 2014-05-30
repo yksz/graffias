@@ -1,11 +1,11 @@
 @Grapes([
     @Grab('org.eclipse.jetty.aggregate:jetty-server:8.1.7.v20120910'),
-    @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.7.v20120910'),
+    @Grab('org.eclipse.jetty.aggregate:jetty-servlet:8.1.7.v20120910'),
     @Grab('javax.servlet:javax.servlet-api:3.0.1')
 ])
 import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.servlet.ServletContextHandler
 import org.eclipse.jetty.servlet.ServletHolder
-import org.eclipse.jetty.webapp.WebAppContext
 import javax.servlet.http.*
 
 class Graffias {
@@ -39,16 +39,15 @@ static def runServer(int port = 8080, String root = 'public') {
 
 class WebServer {
     def jetty
-    def webapp
+    def context
 
     WebServer(int port, String root, List<Map> mappings) {
-        webapp = new WebAppContext()
-        webapp.resourceBase = root
+        jetty = new Server(port)
+        context = new ServletContextHandler(jetty, '/', ServletContextHandler.SESSIONS)
+        context.resourceBase = root
         mappings.each {
             registerServlet(it)
         }
-        jetty = new Server(port)
-        jetty.handler = webapp
     }
 
     def start() {
@@ -59,7 +58,7 @@ class WebServer {
     private def registerServlet(mapping) {
         def servlet = new GraffiasServlet()
         servlet[mapping.method] = mapping.closure
-        webapp.addServlet(new ServletHolder(servlet), mapping.path)
+        context.addServlet(new ServletHolder(servlet), mapping.path)
     }
 }
 
