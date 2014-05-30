@@ -89,7 +89,7 @@ class GraffiasServlet extends HttpServlet {
                 response.writer.write(result.toString())
             }
         } else {
-            response.sendEror(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
+            response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
         }
     }
 }
