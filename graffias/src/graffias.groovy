@@ -40,6 +40,7 @@ static def runServer(int port = 8080, String root = 'public') {
 class WebServer {
     def jetty
     def context
+    def servlets = [:]
 
     WebServer(int port, String root, List<Map> mappings) {
         jetty = new Server(port)
@@ -56,7 +57,11 @@ class WebServer {
     }
 
     private def registerServlet(mapping) {
-        def servlet = new GraffiasServlet()
+        def servlet = servlets[mapping.path]
+        if (!servlet) {
+            servlet = new GraffiasServlet()
+            servlets[mapping.path] = servlet
+        }
         servlet[mapping.method] = mapping.closure
         context.addServlet(new ServletHolder(servlet), mapping.path)
     }
@@ -84,7 +89,7 @@ class GraffiasServlet extends HttpServlet {
     private def exec(request, response, closure) {
         if (closure) {
             closure.delegate = response
-            def result = closure()
+            def result = closure(request)
             if (result instanceof String || result instanceof GString) {
                 response.writer.write(result.toString())
             }

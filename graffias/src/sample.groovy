@@ -1,7 +1,7 @@
 import static graffias.*
 
 get('/') {
-    'Hello World!'
+    'index'
 }
 
 get('/hello') {
@@ -11,6 +11,10 @@ get('/hello') {
     <h1>Hello World!</h1>
     </body></html>
     """
+}
+
+post('/hello') { req ->
+    req.parameterMap.toString()
 }
 
 runServer()
