@@ -14,7 +14,7 @@ get('/hello') {
 }
 
 post('/hello') { req ->
-    req.parameterMap.toString()
+    req.params.toString()
 }
 
 runServer()

@@ -7,6 +7,7 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 import javax.servlet.http.*
+import groovy.servlet.TemplateServlet
 
 class Graffias {
     static def mappings = []
@@ -49,6 +50,7 @@ class WebServer {
         mappings.each {
             registerServlet(it)
         }
+        webapp.addServlet(TemplateServlet, "*.gsp")
         jetty.handler = webapp
     }
 
@@ -91,6 +93,7 @@ class GraffiasServlet extends HttpServlet {
 
     private def exec(request, response, closure) {
         if (closure) {
+            expand(request)
             closure.delegate = response
             def result = closure(request)
             if (result instanceof String || result instanceof GString) {
@@ -99,5 +102,13 @@ class GraffiasServlet extends HttpServlet {
         } else {
             response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
         }
+    }
+
+    private def expand(request) {
+        def params = [:]
+        request.parameterMap.each { key, value ->
+            params[key] = value.size() == 1 ? value[0] : value
+        }
+        request.metaClass.params = params
     }
 }
