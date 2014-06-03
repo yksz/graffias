@@ -9,7 +9,7 @@ import org.eclipse.jetty.webapp.WebAppContext
 import javax.servlet.http.*
 import groovy.servlet.*
 
-class Graffias {
+class Config {
     static def views = '/WEB-INF/views'
     static def mappings = []
 }
@@ -31,19 +31,22 @@ static def delete(String path, Closure closure) {
 }
 
 private static def register(method, path, closure) {
-    Graffias.mappings << [method: method, path: path, closure: closure]
+    Config.mappings << [method: method, path: path, closure: closure]
 }
 
 static def render(String view) {
-    new URI(view)
+    new URI("${Config.views}/${view}")
 }
 
 static def runServer(int port = 8080, String root = 'public') {
-    def server = new WebServer(port, root, Graffias.mappings)
+    def server = new WebServer(port, root, Config.mappings)
     server.start()
 }
 
 class WebServer {
+    static {
+        System.setProperty('groovy.source.encoding', 'utf-8')
+    }
     def jetty
     def webapp
     def servlets = [:]
@@ -82,22 +85,22 @@ class GraffiasServlet extends HttpServlet {
     def get, post, put, delete
 
     void doGet(HttpServletRequest request, HttpServletResponse response) {
-        exec(request, response, get)
+        execute(request, response, get)
     }
 
     void doPost(HttpServletRequest request, HttpServletResponse response) {
-        exec(request, response, post)
+        execute(request, response, post)
     }
 
     void doPut(HttpServletRequest request, HttpServletResponse response) {
-        exec(request, response, put)
+        execute(request, response, put)
     }
 
     void doDelete(HttpServletRequest request, HttpServletResponse response) {
-        exec(request, response, delete)
+        execute(request, response, delete)
     }
 
-    private def exec(request, response, closure) {
+    private def execute(request, response, closure) {
         if (!closure) {
             response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
             return
@@ -111,7 +114,7 @@ class GraffiasServlet extends HttpServlet {
                 response.writer.write(result.toString())
                 break
             case URI:
-                def path = "${Graffias.views}/${result}"
+                def path = result.toString()
                 def dispatcher = request.getRequestDispatcher(path)
                 dispatcher.forward(request, response)
                 break
