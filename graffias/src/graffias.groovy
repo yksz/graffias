@@ -7,9 +7,10 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 import javax.servlet.http.*
-import groovy.servlet.TemplateServlet
+import groovy.servlet.*
 
 class Graffias {
+    static def views = '/WEB-INF/views'
     static def mappings = []
 }
 
@@ -33,6 +34,10 @@ private static def register(method, path, closure) {
     Graffias.mappings << [method: method, path: path, closure: closure]
 }
 
+static def render(String view) {
+    new URI(view)
+}
+
 static def runServer(int port = 8080, String root = 'public') {
     def server = new WebServer(port, root, Graffias.mappings)
     server.start()
@@ -45,13 +50,14 @@ class WebServer {
 
     WebServer(int port, String root, List<Map> mappings) {
         jetty = new Server(port)
-        webapp = new WebAppContext()
+        webapp = new WebAppContext(jetty, null, '/')
         webapp.resourceBase = root
+        webapp.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "false")
+        webapp.addServlet(GroovyServlet, '*.groovy')
+        webapp.addServlet(TemplateServlet, '*.gsp')
         mappings.each {
             registerServlet(it)
         }
-        webapp.addServlet(TemplateServlet, "*.gsp")
-        jetty.handler = webapp
     }
 
     def start() {
@@ -92,15 +98,23 @@ class GraffiasServlet extends HttpServlet {
     }
 
     private def exec(request, response, closure) {
-        if (closure) {
-            expand(request)
-            closure.delegate = response
-            def result = closure(request)
-            if (result instanceof String || result instanceof GString) {
-                response.writer.write(result.toString())
-            }
-        } else {
+        if (!closure) {
             response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
+            return
+        }
+        expand(request)
+        closure.delegate = response
+        def result = closure(request)
+        switch (result) {
+            case String:
+            case GString:
+                response.writer.write(result.toString())
+                break
+            case URI:
+                def path = "${Graffias.views}/${result}"
+                def dispatcher = request.getRequestDispatcher(path)
+                dispatcher.forward(request, response)
+                break
         }
     }
 

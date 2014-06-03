@@ -13,8 +13,12 @@ get('/hello') {
     """
 }
 
-post('/hello') { req ->
-    req.params.toString()
+get('/hello/gsp') {
+    render('hello.gsp')
+}
+
+post('/') { req ->
+    "${req.params}"
 }
 
 runServer()
