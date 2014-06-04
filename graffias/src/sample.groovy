@@ -22,8 +22,12 @@ get('/hello/gsp') {
     view('hello.gsp')
 }
 
+get('/redirect') {
+    sendRedirect('/hello')
+}
+
 post('/') { req ->
-    "${req.params}"
+    "${req.parameterMap}"
 }
 
 error(404, view('404.html'))

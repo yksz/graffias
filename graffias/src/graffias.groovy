@@ -65,7 +65,7 @@ class WebServer {
         jetty = new Server(port)
         webapp = new WebAppContext(jetty, null, '/')
         webapp.resourceBase = root
-        webapp.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "false")
+        webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
         webapp.addServlet(GroovyServlet, '*.groovy')
         webapp.addServlet(TemplateServlet, '*.gsp')
         mappings.each {
@@ -134,7 +134,6 @@ class GraffiasServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
             return
         }
-        expand(request)
         closure.delegate = response
         def result = closure(request)
         switch (result) {
@@ -148,14 +147,6 @@ class GraffiasServlet extends HttpServlet {
                 dispatcher.forward(request, response)
                 break
         }
-    }
-
-    private def expand(request) {
-        def params = [:]
-        request.parameterMap.each { key, value ->
-            params[key] = value.size() == 1 ? value[0] : value
-        }
-        request.metaClass.params = params
     }
 }
 
