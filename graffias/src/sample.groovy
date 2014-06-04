@@ -5,6 +5,7 @@ get('/') {
 }
 
 get('/hello') {
+    println 'get hello'
     setContentType 'text/html'
     """
     <html><body>
@@ -13,12 +14,18 @@ get('/hello') {
     """
 }
 
+filter('/hello') {
+    println 'filter'
+}
+
 get('/hello/gsp') {
-    render('hello.gsp')
+    view('hello.gsp')
 }
 
 post('/') { req ->
     "${req.params}"
 }
+
+error(404, view('404.html'))
 
 runServer()
