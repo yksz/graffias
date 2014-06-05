@@ -11,7 +11,7 @@ import javax.servlet.http.*
 import groovy.servlet.*
 
 class Config {
-    static def viewsPath = '/WEB-INF/views'
+    static def views = '/WEB-INF/views'
     static def mappings = []
     static def errors = []
 }
@@ -45,26 +45,27 @@ static def error(int status, uri) {
 }
 
 static def view(String path) {
-    new URI("${Config.viewsPath}/${path}")
+    "${Config.views}/${path}".toURI()
 }
 
-static def runServer(int port = 8080, String root = 'public') {
-    def server = new WebServer(port, root, Config.mappings, Config.errors)
+static def runServer(int port = 8080) {
+    def server = new WebServer(port, Config.mappings, Config.errors)
     server.start()
 }
 
 class WebServer {
     static {
         System.setProperty('groovy.source.encoding', 'utf-8')
+        GraffiasMethod.expand()
     }
     def jetty
     def webapp
     def servlets = [:]
 
-    WebServer(int port, String root, List<Map> mappings, List<Map> errors) {
+    WebServer(int port, List<Map> mappings, List<Map> errors) {
         jetty = new Server(port)
         webapp = new WebAppContext(jetty, null, '/')
-        webapp.resourceBase = root
+        webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
         webapp.addServlet(GroovyServlet, '*.groovy')
         webapp.addServlet(TemplateServlet, '*.gsp')
@@ -72,7 +73,7 @@ class WebServer {
             registerMapping(it)
         }
         errors.each {
-            registerErrors(it)
+            registerErrorPage(it)
         }
     }
 
@@ -105,7 +106,7 @@ class WebServer {
         webapp.addFilter(new FilterHolder(filter), mapping.path, EnumSet.of(DispatcherType.REQUEST))
     }
 
-    private def registerErrors(error) {
+    private def registerErrorPage(error) {
         webapp.errorHandler.addErrorPage(error.status, error.uri)
     }
 }
@@ -142,8 +143,7 @@ class GraffiasServlet extends HttpServlet {
                 response.writer.write(result.toString())
                 break
             case URI:
-                def path = result.toString()
-                def dispatcher = request.getRequestDispatcher(path)
+                def dispatcher = request.getRequestDispatcher(result.toString())
                 dispatcher.forward(request, response)
                 break
         }
@@ -163,4 +163,18 @@ class GraffiasFilter implements Filter {
 
     void init(FilterConfig filterConfig) {}
     void destroy() {}
+}
+
+class GraffiasMethod {
+    static def expand() {
+        def method = {
+            setAttributes { Map<String, Object> attrs ->
+                attrs.each { key, value ->
+                    delegate.setAttribute(key, value)
+                }
+            }
+        }
+        HttpServletRequest.metaClass.define(method)
+        HttpSession.metaClass.define(method)
+    }
 }
