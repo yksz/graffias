@@ -58,6 +58,7 @@ class WebServer {
         System.setProperty('groovy.source.encoding', 'utf-8')
         GraffiasMethod.expand()
     }
+
     def jetty
     def webapp
     def servlets = [:]
@@ -69,12 +70,8 @@ class WebServer {
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
         webapp.addServlet(GroovyServlet, '*.groovy')
         webapp.addServlet(TemplateServlet, '*.gsp')
-        mappings.each {
-            registerMapping(it)
-        }
-        errors.each {
-            registerErrorPage(it)
-        }
+        mappings.each { registerMapping(it) }
+        errors.each { registerErrorPage(it) }
     }
 
     def start() {
@@ -103,7 +100,8 @@ class WebServer {
 
     private def registerFilter(mapping) {
         def filter = new GraffiasFilter(closure: mapping.closure)
-        webapp.addFilter(new FilterHolder(filter), mapping.path, EnumSet.of(DispatcherType.REQUEST))
+        def dispatches = EnumSet.of(DispatcherType.REQUEST)
+        webapp.addFilter(new FilterHolder(filter), mapping.path, dispatches)
     }
 
     private def registerErrorPage(error) {
