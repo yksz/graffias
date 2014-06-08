@@ -9,7 +9,6 @@ Graffias is distributed as a single file,
 and it's source code is only about 200 lines.  
 So, please customize it freely!
 
-
 Example
 =======
 
@@ -20,12 +19,48 @@ get('/') {
     'Hello World!'
 }
 
-// /hello?name=You
-get('/hello') { req ->
-    "Hello '${req.getParameter('name')}'"
+runServer()
+```
+
+```groovy
+import static graffias.*
+
+get('/') {
+    'index.html'.toURI()
 }
 
-runServer()
+post('/') { req ->
+    "${req.parameterMap}"
+}
+
+get('/hello') { req ->
+    setContentType 'text/html'
+    setStatus 200
+    """
+    <html><body>
+    <h1>
+    Hello World!
+    (filter = ${req.getAttribute('filter')})
+    </h1>
+    </body></html>
+    """
+}
+
+filter('/hello') { req ->
+    req.setAttributes(filter: 'on')
+}
+
+get('/gsp/*') {
+    view 'hello.gsp'
+}
+
+get('/redirect') {
+    sendRedirect '/'
+}
+
+error(404, view('404.html'))
+
+runServer(8080)
 ```
 
 Installation
