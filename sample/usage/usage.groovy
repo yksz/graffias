@@ -1,7 +1,7 @@
 import static graffias.*
 
 get('/') {
-    'index.html'.toURI() // public/index.html
+    uri 'index.html' // public/index.html
 }
 
 post('/') { req ->

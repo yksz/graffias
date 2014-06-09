@@ -44,6 +44,10 @@ static def error(int status, uri) {
     Config.errors << [status: status, uri: uri.toString()]
 }
 
+static def uri(String path) {
+    path.toURI()
+}
+
 static def view(String path) {
     "${Config.views}/${path}".toURI()
 }

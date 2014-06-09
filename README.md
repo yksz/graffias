@@ -26,7 +26,7 @@ runServer()
 import static graffias.*
 
 get('/') {
-    'index.html'.toURI()
+    uri 'index.html'
 }
 
 post('/') { req ->
