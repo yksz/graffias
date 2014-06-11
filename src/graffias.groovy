@@ -6,6 +6,8 @@
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
+import org.eclipse.jetty.websocket.*
+import org.eclipse.jetty.websocket.WebSocket.Connection
 import javax.servlet.*
 import javax.servlet.http.*
 import groovy.servlet.*
@@ -34,6 +36,10 @@ static def delete(String path, Closure closure) {
 
 static def filter(String path, Closure closure) {
     register('filter', path, closure)
+}
+
+static def websocket(String path, Closure closure) {
+    register('websocket', path, closure)
 }
 
 private static def register(method, path, closure) {
@@ -88,6 +94,8 @@ class WebServer {
             mapping.path = ''
         if (mapping.method == 'filter')
             registerFilter(mapping)
+        else if (mapping.method == 'websocket')
+            registerWebSocket(mapping)
         else
             registerServlet(mapping)
     }
@@ -106,6 +114,15 @@ class WebServer {
         def filter = new GraffiasFilter(closure: mapping.closure)
         def dispatches = EnumSet.of(DispatcherType.REQUEST)
         webapp.addFilter(new FilterHolder(filter), mapping.path, dispatches)
+    }
+
+    private def registerWebSocket(mapping) {
+        def servlet = [
+            doWebSocketConnect: { HttpServletRequest request, String protocol ->
+                WebSocketDSL.websocket(protocol, mapping.closure)
+            }
+        ] as WebSocketServlet
+        webapp.addServlet(new ServletHolder(servlet), mapping.path)
     }
 
     private def registerErrorPage(error) {
@@ -178,5 +195,33 @@ class GraffiasMethod {
         }
         HttpServletRequest.metaClass.define(method)
         HttpSession.metaClass.define(method)
+    }
+}
+
+class WebSocketDSL {
+    static def websocket(String protocol, Closure closure) {
+        def dsl = new WebSocketDSL()
+        def c = closure.clone()
+        c.delegate = dsl
+        c(protocol)
+        [
+            onOpen: { Connection connection -> dsl.onopen(connection) },
+            onClose: { int closeCode, String message -> dsl.onclose(closeCode) },
+            onMessage: { String data -> dsl.onmessage(data) }
+        ] as WebSocket.OnTextMessage
+    }
+
+    def onopen, onclose, onmessage
+
+    def onopen(Closure onopen) {
+        this.onopen = onopen
+    }
+
+    def onclose(Closure onclose) {
+        this.onclose = onclose
+    }
+
+    def onmessage(Closure onmessage) {
+        this.onmessage = onmessage
     }
 }
