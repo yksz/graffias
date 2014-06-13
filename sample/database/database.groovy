@@ -1,16 +1,16 @@
-@Grab(group='com.h2database', module='h2', version='1.4+')
+@Grab(group='com.h2database', module='h2', version='1.3+')
 import groovy.sql.Sql
 import static graffias.*
 
 def db = [
-    url: 'jdbc:h2:file:db/testDB',
+    url: 'jdbc:h2:file:./db/testDB',
     rser: 'sa',
     password: '',
     driver: 'org.h2.Driver'
 ]
 
 def sql = Sql.newInstance(db.url, db.user, db.password, db.driver)
-Book.updateTable(sql)
+Book.createTable(sql)
 
 get('/book') { req ->
     def books = []

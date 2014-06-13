@@ -4,23 +4,17 @@ class Book {
     static def createTable(sql) {
         sql.withTransaction {
             sql.execute '''
-                create table BOOK (
+                create table if not exists BOOK (
                     id int not null primary key,
                     title nvarchar(50) not null unique,
                     author nvarchar(50),
                 )
             '''
-            // default books
-            save(sql, [1, 'abc', '123'])
-            save(sql, [2, 'def', '456'])
-        }
-    }
-
-    static def updateTable(sql) {
-        try {
-            count(sql)
-        } catch (e) {
-            createTable(sql)
+            if (count(sql) == 0) {
+                // default books
+                save(sql, [1, 'abc', '123'])
+                save(sql, [2, 'def', '456'])
+            }
         }
     }
 
