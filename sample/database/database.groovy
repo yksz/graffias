@@ -3,7 +3,7 @@ import groovy.sql.Sql
 import static graffias.*
 
 def db = [
-    url: 'jdbc:h2:file:./db/testDB',
+    url: 'jdbc:h2:file:./db/testDB;MVCC=TRUE;LOCK_TIMEOUT=10000',
     rser: 'sa',
     password: '',
     driver: 'org.h2.Driver'
