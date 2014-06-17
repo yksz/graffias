@@ -1,7 +1,7 @@
 import groovy.sql.Sql
 
-class Book {
-    static def createTable(sql) {
+class BookSql {
+    static def createBook(sql) {
         sql.withTransaction {
             sql.execute '''
                 create table if not exists BOOK (
@@ -10,35 +10,35 @@ class Book {
                     author nvarchar(50),
                 )
             '''
-            if (count(sql) == 0) {
+            if (countBook(sql) == 0) {
                 // default books
-                save(sql, [1, 'abc', '123'])
-                save(sql, [2, 'def', '456'])
+                saveBook(sql, [1, 'abc', '123'])
+                saveBook(sql, [2, 'def', '456'])
             }
         }
     }
 
-    static def count(sql) {
+    static def countBook(sql) {
         def rows = sql.rows '''
             select count(*) from BOOK
         '''
         rows[0]['COUNT(*)']
     }
 
-    static def find(sql, id) {
+    static def findBook(sql, id) {
         sql.firstRow '''
             select * from BOOK
             where id = ?
         ''', [id]
     }
 
-    static def findAll(sql) {
+    static def findAllBooks(sql) {
         sql.rows '''
             select * from BOOK
         '''
     }
 
-    static def save(sql, params) {
+    static def saveBook(sql, params) {
         sql.execute '''
             insert into BOOK (id, title, author)
             values (?, ?, ?)

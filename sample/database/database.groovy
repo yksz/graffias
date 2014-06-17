@@ -1,4 +1,4 @@
-@Grab(group='com.h2database', module='h2', version='1.3+')
+@Grab(group='com.h2database', module='h2', version='1.3.+')
 import groovy.sql.Sql
 import static graffias.*
 
@@ -10,15 +10,16 @@ def db = [
 ]
 
 def sql = Sql.newInstance(db.url, db.user, db.password, db.driver)
-Book.createTable(sql)
+Sql.mixin(BookSql)
+sql.createBook()
 
 get('/book') { req ->
     def books = []
     def id = req.getParameter('id')
     if (id)
-        books = Book.find(sql, id)
+        books << sql.findBook(id)
     else
-        books = Book.findAll(sql)
+        books = sql.findAllBooks()
     req.setAttributes(books: books)
     setContentType 'text/html'
     view 'book.gsp'
@@ -29,7 +30,7 @@ post('/book') { req ->
     def title = req.getParameter('title')
     def author = req.getParameter('author')
     try {
-        Book.save(sql, [id, title, author])
+        sql.saveBook([id, title, author])
         setStatus 200
     } catch (e) {
         setStatus 400
