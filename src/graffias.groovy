@@ -203,6 +203,7 @@ class WebSocketDSL {
         def dsl = new WebSocketDSL()
         def c = closure.clone()
         c.delegate = dsl
+        c.resolveStrategy = Closure.DELEGATE_FIRST
         c(protocol)
         [
             onOpen: { Connection connection -> dsl.onopen(connection) },
