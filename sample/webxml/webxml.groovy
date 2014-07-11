@@ -1,0 +1,3 @@
+import static graffias.*
+
+runServer()
