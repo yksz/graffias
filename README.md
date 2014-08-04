@@ -60,7 +60,7 @@ get('/redirect') {
 
 error(404, view('404.html'))
 
-runServer(8080)
+runServer(8080, '/')
 ```
 
 Example - WebSocket

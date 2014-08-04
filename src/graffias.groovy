@@ -58,8 +58,8 @@ static def view(String path) {
     "${Config.views}/${path}".toURI()
 }
 
-static def runServer(int port = 8080) {
-    def server = new WebServer(port, Config.mappings, Config.errors)
+static def runServer(int port = 8080, String contextPath = '/') {
+    def server = new WebServer(port, contextPath, Config.mappings, Config.errors)
     server.start()
 }
 
@@ -73,9 +73,9 @@ class WebServer {
     def webapp
     def servlets = [:]
 
-    WebServer(int port, List<Map> mappings, List<Map> errors) {
+    WebServer(int port, String contextPath, List<Map> mappings, List<Map> errors) {
         jetty = new Server(port)
-        webapp = new WebAppContext(jetty, null, '/')
+        webapp = new WebAppContext(jetty, null, contextPath)
         webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
         webapp.addServlet(GroovyServlet, '*.groovy')
