@@ -1,6 +1,6 @@
 @Grapes([
-    @Grab('org.eclipse.jetty.aggregate:jetty-server:8.1.7.v20120910'),
-    @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.7.v20120910'),
+    @Grab('org.eclipse.jetty.aggregate:jetty-server:8.1.15.v20140411'),
+    @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.15.v20140411'),
     @Grab('javax.servlet:javax.servlet-api:3.0.1')
 ])
 import org.eclipse.jetty.server.Server
