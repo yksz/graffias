@@ -14,8 +14,7 @@ import groovy.servlet.*
 
 class Config {
     static def views = '/WEB-INF/views'
-    static def mappings = []
-    static def errors = []
+    static def mappings = [], errors = []
 }
 
 static def get(String path, Closure closure) {
@@ -51,7 +50,7 @@ static def error(int status, uri) {
 }
 
 static def uri(String path) {
-    path.toURI()
+    "/${path}".toURI()
 }
 
 static def view(String path) {
@@ -69,9 +68,7 @@ class WebServer {
         GraffiasMethod.expand()
     }
 
-    def jetty
-    def webapp
-    def servlets = [:]
+    def jetty, webapp, servlets = [:]
 
     WebServer(int port, String contextPath, List<Map> mappings, List<Map> errors) {
         jetty = new Server(port)
@@ -162,7 +159,11 @@ class GraffiasServlet extends HttpServlet {
                 response.writer.write(result.toString())
                 break
             case URI:
-                def dispatcher = request.getRequestDispatcher(result.toString())
+                def dispatcher
+                if (result.toString() == request.requestURI - request.contextPath)
+                    dispatcher = servletContext.getNamedDispatcher('default')
+                else
+                    dispatcher = request.getRequestDispatcher(result.toString())
                 dispatcher.forward(request, response)
                 break
         }
