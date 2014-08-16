@@ -13,7 +13,6 @@ import javax.servlet.http.*
 import groovy.servlet.*
 
 class Config {
-    static def views = '/WEB-INF/views'
     static def mappings = [], errors = []
 }
 
@@ -54,7 +53,7 @@ static def uri(String path) {
 }
 
 static def view(String path) {
-    "${Config.views}/${path}".toURI()
+    "/WEB-INF/views/${path}".toURI()
 }
 
 static def runServer(int port = 8080, String contextPath = '/') {
