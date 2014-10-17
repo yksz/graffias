@@ -25,6 +25,10 @@ filter('/hello') { req ->
     req.setAttributes(filter: 'on') // an expanded method
 }
 
+get('/groovy/*') {
+    view 'hello.groovy' // public/WEB-INF/views/hello.groovy
+}
+
 get('/gsp/*') {
     view 'hello.gsp' // public/WEB-INF/views/hello.gsp
 }
