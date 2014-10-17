@@ -10,7 +10,6 @@ import org.eclipse.jetty.websocket.*
 import org.eclipse.jetty.websocket.WebSocket.Connection
 import javax.servlet.*
 import javax.servlet.http.*
-import groovy.servlet.*
 
 class Config {
     static def mappings = [], errors = []
@@ -44,7 +43,7 @@ private static def register(method, path, closure) {
     Config.mappings << [method: method, path: path, closure: closure]
 }
 
-static def error(int status, uri) {
+static def error(int status, URI uri) {
     Config.errors << [status: status, uri: uri.toString()]
 }
 
@@ -57,14 +56,25 @@ static def view(String path) {
 }
 
 static def runServer(int port = 8080, String contextPath = '/') {
-    def server = new WebServer(port, contextPath, Config.mappings, Config.errors)
-    server.start()
+    new WebServer(port, contextPath, Config.mappings, Config.errors).start()
+}
+
+private static expandMethod() {
+    def setAttributesMethod = {
+        setAttributes { Map<String, Object> attrs ->
+            attrs.each { key, value ->
+                delegate.setAttribute(key, value)
+            }
+        }
+    }
+    HttpServletRequest.metaClass.define(setAttributesMethod)
+    HttpSession.metaClass.define(setAttributesMethod)
 }
 
 class WebServer {
     static {
         System.setProperty('groovy.source.encoding', 'utf-8')
-        GraffiasMethod.expand()
+        graffias.expandMethod()
     }
 
     def jetty, webapp, servlets = [:]
@@ -74,8 +84,8 @@ class WebServer {
         webapp = new WebAppContext(jetty, null, contextPath)
         webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
-        webapp.addServlet(GroovyServlet, '*.groovy')
-        webapp.addServlet(TemplateServlet, '*.gsp')
+        webapp.addServlet(groovy.servlet.GroovyServlet, '*.groovy')
+        webapp.addServlet(groovy.servlet.TemplateServlet, '*.gsp')
         mappings.each { registerMapping(it) }
         errors.each { registerErrorPage(it) }
     }
@@ -182,20 +192,6 @@ class GraffiasFilter implements Filter {
 
     void init(FilterConfig filterConfig) {}
     void destroy() {}
-}
-
-class GraffiasMethod {
-    static def expand() {
-        def method = {
-            setAttributes { Map<String, Object> attrs ->
-                attrs.each { key, value ->
-                    delegate.setAttribute(key, value)
-                }
-            }
-        }
-        HttpServletRequest.metaClass.define(method)
-        HttpSession.metaClass.define(method)
-    }
 }
 
 class WebSocketDSL {
