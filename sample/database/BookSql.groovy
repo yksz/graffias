@@ -4,13 +4,13 @@ class BookSql {
     static def createBook(sql) {
         sql.withTransaction {
             sql.execute '''
-                create table if not exists BOOK (
-                    id int not null primary key,
-                    title nvarchar(50) not null unique,
-                    author nvarchar(50),
+                CREATE TABLE IF NOT EXISTS book (
+                    id int NOT NULL PRIMARY KEY,
+                    title varchar(50) NOT NULL,
+                    author varchar(50) NOT NULL
                 )
             '''
-            if (countBook(sql) == 0) {
+            if (countBooks(sql) == 0) {
                 // default books
                 saveBook(sql, [1, 'abc', '123'])
                 saveBook(sql, [2, 'def', '456'])
@@ -18,30 +18,30 @@ class BookSql {
         }
     }
 
-    static def countBook(sql) {
+    static def countBooks(sql) {
         def rows = sql.rows '''
-            select count(*) from BOOK
+            SELECT COUNT(*) FROM book
         '''
         rows[0]['COUNT(*)']
     }
 
     static def findBook(sql, id) {
         sql.firstRow '''
-            select * from BOOK
-            where id = ?
+            SELECT * FROM book
+            WHERE id = ?
         ''', [id]
     }
 
     static def findAllBooks(sql) {
         sql.rows '''
-            select * from BOOK
+            SELECT * FROM book
         '''
     }
 
     static def saveBook(sql, params) {
         sql.execute '''
-            insert into BOOK (id, title, author)
-            values (?, ?, ?)
+            INSERT INTO book (id, title, author)
+            VALUES (?, ?, ?)
         ''', params
     }
 }

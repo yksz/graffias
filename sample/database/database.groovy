@@ -1,6 +1,6 @@
 @Grab(group='com.h2database', module='h2', version='1.3.+')
-import groovy.sql.Sql
 import static graffias.*
+import groovy.sql.Sql
 
 def db = [
     url: 'jdbc:h2:file:./db/testDB;MVCC=TRUE;LOCK_TIMEOUT=10000',
