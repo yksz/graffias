@@ -1,10 +1,13 @@
+@Grab(group='commons-lang', module='commons-lang', version='2.6')
 import static graffias.*
+import org.apache.commons.lang.StringEscapeUtils
 
 get('/') {
     uri 'index.html' // public/index.html
 }
 
 post('/') { req ->
+    setContentType 'text/plain'
     "${req.parameterMap}" // HttpServletRequest.getParameterMap()
 }
 
@@ -23,6 +26,11 @@ get('/hello') { req ->
 
 filter('/hello') { req ->
     req.setAttributes(filter: 'on') // an expanded method
+}
+
+get('/security') { req ->
+    setContentType 'text/html'
+    StringEscapeUtils.escapeHtml("${req.parameterMap}") // XSS prevention
 }
 
 get('/groovy/*') {
