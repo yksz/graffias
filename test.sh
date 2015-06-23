@@ -3,12 +3,12 @@ cp src/graffias.groovy test
 
 cd test
 echo "Running the server."
-groovy server.groovy &
+groovy testServer.groovy &
 pid=$!
 sleep 5
 
 echo "Test has been started."
-groovy client.groovy
+groovy testClient.groovy
 echo "Test has been completed."
 
 echo "Shutting down the server."
