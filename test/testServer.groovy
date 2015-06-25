@@ -37,4 +37,19 @@ get('/gsp') {
 
 error(404, view('404.html'))
 
+websocket('/websocket') { protocol ->
+    def connection
+    onopen { conn ->
+        connection = conn
+    }
+    onclose { code ->
+        if (connection)
+            connection.close()
+    }
+    onmessage { msg ->
+        def sub = protocol ?: ''
+        connection.sendMessage("${sub}:${msg}")
+    }
+}
+
 runServer(55555)

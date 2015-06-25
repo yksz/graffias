@@ -1,13 +1,19 @@
 @Grapes([
-    @Grab('org.codehaus.groovy.modules.http-builder:http-builder:0.7.1')
+    @Grab('org.codehaus.groovy.modules.http-builder:http-builder:0.7.1'),
+    @Grab('org.eclipse.jetty:jetty-websocket:8.1.7.v20120910')
 ])
-import groovy.util.GroovyTestCase
 import static groovy.test.GroovyAssert.*
-import groovyx.net.http.*
 import static groovyx.net.http.ContentType.*
+import groovy.util.GroovyTestCase
+import groovyx.net.http.*
+import java.util.concurrent.TimeUnit
+import org.eclipse.jetty.websocket.*
 
 class GraffiasTest extends GroovyTestCase {
-    def http = new HTTPBuilder('http://localhost:55555')
+    static final def HOST = 'localhost'
+    static final def PORT = 55555
+
+    def http = new HTTPBuilder("http://${HOST}:${PORT}")
 
     void testGet_Override() {
         http.get(path: '/', contentType: TEXT) { resp, reader ->
@@ -65,10 +71,44 @@ class GraffiasTest extends GroovyTestCase {
         assert e.message == 'Not Found'
     }
 
-    void testWebXml() {
+    void testWebXml_Classes() {
         http.get(path: '/classes') { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'TestServlet'
         }
+    }
+
+    void testWebSocket() {
+        // setup:
+        def url = "ws://${HOST}:${PORT}/websocket"
+        def subProtocol = 'sub'
+        def sendMessage = 'Hello World'
+
+        def factory = new WebSocketClientFactory()
+        factory.start()
+        def client = factory.newWebSocketClient()
+        client.protocol = subProtocol
+
+        // when:
+        // then:
+        def webSocket = new WebSocket.OnTextMessage() {
+            void onOpen(WebSocket.Connection connection) {
+            }
+
+            void onClose(int closeCode, String message) {
+                assert closeCode == 1000
+                assert message == null
+            }
+
+            void onMessage(String data) {
+                assert data == "${subProtocol}:${sendMessage}"
+            }
+        }
+        def connection = client.open(new URI(url), webSocket, 5, TimeUnit.SECONDS)
+        connection.sendMessage(sendMessage)
+
+        // cleanup:
+        connection.close()
+        factory.stop()
     }
 }
