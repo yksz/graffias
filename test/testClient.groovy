@@ -79,7 +79,6 @@ class GraffiasTest extends GroovyTestCase {
     }
 
     void testWebSocket() {
-        // setup:
         def url = "ws://${HOST}:${PORT}/websocket"
         def subProtocol = 'sub'
         def sendMessage = 'Hello World'
@@ -89,8 +88,6 @@ class GraffiasTest extends GroovyTestCase {
         def client = factory.newWebSocketClient()
         client.protocol = subProtocol
 
-        // when:
-        // then:
         def webSocket = new WebSocket.OnTextMessage() {
             void onOpen(WebSocket.Connection connection) {
             }
@@ -104,11 +101,13 @@ class GraffiasTest extends GroovyTestCase {
                 assert data == "${subProtocol}:${sendMessage}"
             }
         }
-        def connection = client.open(new URI(url), webSocket, 5, TimeUnit.SECONDS)
-        connection.sendMessage(sendMessage)
-
-        // cleanup:
-        connection.close()
-        factory.stop()
+        def connection
+        try {
+            connection = client.open(new URI(url), webSocket, 5, TimeUnit.SECONDS)
+            connection.sendMessage(sendMessage)
+        } finally {
+            connection?.close()
+            factory.stop()
+        }
     }
 }
