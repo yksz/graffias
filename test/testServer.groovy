@@ -8,6 +8,10 @@ get('/') { // override
     uri 'index.html'
 }
 
+get('/stackoverflow.html') {
+    uri 'stackoverflow.html'
+}
+
 post('/') { req ->
     setContentType 'text/plain'
     "key=${req.getParameter('key')}"

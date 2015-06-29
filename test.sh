@@ -5,7 +5,7 @@ cd test
 echo "Running the server."
 groovy testServer.groovy &
 pid=$!
-sleep 5
+sleep ${1:-5}
 
 echo "Test has been started."
 groovy testClient.groovy

@@ -22,6 +22,13 @@ class GraffiasTest extends GroovyTestCase {
         }
     }
 
+    void testGet_SameURI() {
+        http.get(path: '/stackoverflow.html', contentType: TEXT) { resp, reader ->
+            assert resp.contentType == 'text/html'
+            assert reader.text == '<html><h1>stackoverflow</h1></html>\n'
+        }
+    }
+
     void testPost_Parameter() {
         http.post(path: '/', query: [key:'value']) { resp, reader ->
             assert resp.contentType == 'text/plain'
