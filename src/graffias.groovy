@@ -6,13 +6,13 @@
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
-import org.eclipse.jetty.websocket.*
-import org.eclipse.jetty.websocket.WebSocket.Connection
 import javax.servlet.*
 import javax.servlet.http.*
 
 class Config {
-    static def mappings = [], errors = []
+    static def get = [:], post = [:], put = [:], delete = [:]
+    static def filter = [:]
+    static def error = [:]
 }
 
 static def get(String path, Closure closure) {
@@ -35,16 +35,12 @@ static def filter(String path, Closure closure) {
     register('filter', path, closure)
 }
 
-static def websocket(String path, Closure closure) {
-    register('websocket', path, closure)
-}
-
 private static def register(method, path, closure) {
-    Config.mappings << [method: method, path: path, closure: closure]
+    Config[method] << [(path): closure]
 }
 
 static def error(int status, URI uri) {
-    Config.errors << [status: status, uri: uri.toString()]
+    Config.error << [(status): uri.toString()]
 }
 
 static def uri(String path) {
@@ -56,15 +52,15 @@ static def view(String path) {
 }
 
 static def runServer(int port = 8080, String contextPath = '/') {
-    new WebServer(port, contextPath, Config.mappings, Config.errors).start()
+    def server = new WebServer(port, contextPath)
+    server.start()
 }
 
-private static expandMethod() {
+protected static def defineExpandedMethods() {
     def setAttributesMethod = {
         setAttributes { Map<String, Object> attrs ->
-            attrs.each { key, value ->
-                delegate.setAttribute(key, value)
-            }
+            for (attr in attrs)
+                delegate.setAttribute(attr.key, attr.value)
         }
     }
     HttpServletRequest.metaClass.define(setAttributesMethod)
@@ -73,21 +69,22 @@ private static expandMethod() {
 
 class WebServer {
     static {
-        System.setProperty('groovy.source.encoding', 'utf-8')
-        graffias.expandMethod()
+        System.setProperty('groovy.source.encoding', 'UTF-8')
+        graffias.defineExpandedMethods()
     }
 
     def jetty, webapp, servlets = [:]
 
-    WebServer(int port, String contextPath, List<Map> mappings, List<Map> errors) {
+    WebServer(int port, String contextPath) {
         jetty = new Server(port)
         webapp = new WebAppContext(jetty, null, contextPath)
         webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
+        webapp.start() // load web.xml
         webapp.addServlet(groovy.servlet.GroovyServlet, '*.groovy')
         webapp.addServlet(groovy.servlet.TemplateServlet, '*.gsp')
-        mappings.each { registerMapping(it) }
-        errors.each { registerErrorPage(it) }
+        Config.error.each { status, uri -> webapp.errorHandler.addErrorPage(status, uri) }
+        registerFilter(new GraffiasFilter(), '/*')
     }
 
     def start() {
@@ -95,71 +92,54 @@ class WebServer {
         jetty.join()
     }
 
-    private def registerMapping(mapping) {
-        if (mapping.path == '/')
-            mapping.path = ''
-        if (mapping.method == 'filter')
-            registerFilter(mapping)
-        else if (mapping.method == 'websocket')
-            registerWebSocket(mapping)
-        else
-            registerServlet(mapping)
-    }
-
-    private def registerServlet(mapping) {
-        def servlet = servlets[mapping.path]
-        if (!servlet) {
-            servlet = new GraffiasServlet()
-            servlets[mapping.path] = servlet
-        }
-        servlet[mapping.method] = mapping.closure
-        webapp.addServlet(new ServletHolder(servlet), mapping.path)
-    }
-
-    private def registerFilter(mapping) {
-        def filter = new GraffiasFilter(closure: mapping.closure)
+    private def registerFilter(filter, path) {
         def dispatches = EnumSet.of(DispatcherType.REQUEST)
-        webapp.addFilter(new FilterHolder(filter), mapping.path, dispatches)
-    }
-
-    private def registerWebSocket(mapping) {
-        def servlet = [
-            doWebSocketConnect: { HttpServletRequest request, String protocol ->
-                WebSocketDSL.websocket(protocol, mapping.closure)
-            }
-        ] as WebSocketServlet
-        webapp.addServlet(new ServletHolder(servlet), mapping.path)
-    }
-
-    private def registerErrorPage(error) {
-        webapp.errorHandler.addErrorPage(error.status, error.uri)
+        webapp.addFilter(new FilterHolder(filter), path, dispatches)
     }
 }
 
-class GraffiasServlet extends HttpServlet {
-    def get, post, put, delete
-
-    void doGet(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, get)
+class GraffiasFilter implements Filter {
+    void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+        filter(request, response)
+        def closure = findClosure(request)
+        if (closure)
+            invoke(closure, request, response)
+        else
+            chain.doFilter(request, response)
     }
 
-    void doPost(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, post)
+    private def filter(request, response) {
+        def closure = findClosure(request, Config.filter)
+        if (closure)
+            invoke(closure, request, response)
     }
 
-    void doPut(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, put)
-    }
-
-    void doDelete(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, delete)
-    }
-
-    private def execute(request, response, closure) {
-        if (!closure) {
-            response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
-            return
+    private def findClosure(request) {
+        def method = request.method.toLowerCase()
+        switch (method) {
+            case 'get':
+            case 'post':
+            case 'put':
+            case 'delete':
+                return findClosure(request, Config[method])
         }
+    }
+
+    private def findClosure(request, spec) {
+        def uri = request.requestURI - request.contextPath
+        for (path in spec.keySet()) {
+            switch (path) {
+                case String:
+                    if (path == uri)
+                        return spec[path]
+                    break
+                default:
+                    return null
+            }
+        }
+    }
+
+    private def invoke(closure, request, response) {
         closure.delegate = response
         def result = closure(request)
         switch (result) {
@@ -168,57 +148,12 @@ class GraffiasServlet extends HttpServlet {
                 response.writer.write(result.toString())
                 break
             case URI:
-                def dispatcher
-                if (result.toString() == request.requestURI - request.contextPath)
-                    dispatcher = servletContext.getNamedDispatcher('default')
-                else
-                    dispatcher = request.getRequestDispatcher(result.toString())
+                def dispatcher = request.getRequestDispatcher(result.toString())
                 dispatcher.forward(request, response)
                 break
         }
     }
-}
-
-class GraffiasFilter implements Filter {
-    def closure
-
-    void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
-        if (closure) {
-            closure.delegate = response
-            closure(request)
-        }
-        chain.doFilter(request, response)
-    }
 
     void init(FilterConfig filterConfig) {}
     void destroy() {}
-}
-
-class WebSocketDSL {
-    static def websocket(String protocol, Closure closure) {
-        def dsl = new WebSocketDSL()
-        def c = closure.clone()
-        c.delegate = dsl
-        c.resolveStrategy = Closure.DELEGATE_FIRST
-        c(protocol)
-        [
-            onOpen: { Connection connection -> dsl.onopen(connection) },
-            onClose: { int closeCode, String message -> dsl.onclose(closeCode) },
-            onMessage: { String data -> dsl.onmessage(data) }
-        ] as WebSocket.OnTextMessage
-    }
-
-    def onopen, onclose, onmessage
-
-    def onopen(Closure onopen) {
-        this.onopen = onopen
-    }
-
-    def onclose(Closure onclose) {
-        this.onclose = onclose
-    }
-
-    def onmessage(Closure onmessage) {
-        this.onmessage = onmessage
-    }
 }
