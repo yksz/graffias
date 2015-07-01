@@ -6,13 +6,13 @@
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
+import org.eclipse.jetty.websocket.*
 import javax.servlet.*
 import javax.servlet.http.*
 
 class Config {
     static def get = [:], post = [:], put = [:], delete = [:]
-    static def filter = [:]
-    static def error = [:]
+    static def filter = [:], websocket = [:], error = [:]
 }
 
 static def get(String path, Closure closure) {
@@ -35,8 +35,12 @@ static def filter(String path, Closure closure) {
     register('filter', path, closure)
 }
 
-private static def register(method, path, closure) {
-    Config[method] << [(path): closure]
+static def websocket(String path, Closure closure) {
+    register('websocket', path, closure)
+}
+
+private static def register(method, route, closure) {
+    Config[method] << [(route): closure]
 }
 
 static def error(int status, URI uri) {
@@ -73,7 +77,7 @@ class WebServer {
         graffias.defineExpandedMethods()
     }
 
-    def jetty, webapp, servlets = [:]
+    def jetty, webapp
 
     WebServer(int port, String contextPath) {
         jetty = new Server(port)
@@ -83,8 +87,9 @@ class WebServer {
         webapp.start() // load web.xml
         webapp.addServlet(groovy.servlet.GroovyServlet, '*.groovy')
         webapp.addServlet(groovy.servlet.TemplateServlet, '*.gsp')
-        Config.error.each { status, uri -> webapp.errorHandler.addErrorPage(status, uri) }
         registerFilter(new GraffiasFilter(), '/*')
+        Config.websocket.each { path, closure -> registerWebSocket(path, closure) }
+        Config.error.each { status, uri -> webapp.errorHandler.addErrorPage(status, uri) }
     }
 
     def start() {
@@ -96,16 +101,21 @@ class WebServer {
         def dispatches = EnumSet.of(DispatcherType.REQUEST)
         webapp.addFilter(new FilterHolder(filter), path, dispatches)
     }
+
+    private def registerWebSocket(path, closure) {
+        def servlet = [
+            doWebSocketConnect: { HttpServletRequest request, String protocol ->
+                return WebSocketDSL.websocket(request, protocol, closure)
+            }
+        ] as WebSocketServlet
+        webapp.addServlet(new ServletHolder(servlet), path)
+    }
 }
 
 class GraffiasFilter implements Filter {
     void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
         filter(request, response)
-        def closure = findClosure(request)
-        if (closure)
-            invoke(closure, request, response)
-        else
-            chain.doFilter(request, response)
+        doMainProcess(request, response, chain)
     }
 
     private def filter(request, response) {
@@ -114,7 +124,19 @@ class GraffiasFilter implements Filter {
             invoke(closure, request, response)
     }
 
-    private def findClosure(request) {
+    private def doMainProcess(request, response, chain) {
+        if ('websocket'.equalsIgnoreCase(request.getHeader('Upgrade'))) {
+            chain.doFilter(request, response)
+            return
+        }
+        def closure = findHttpMethodClosure(request)
+        if (closure)
+            invoke(closure, request, response)
+        else
+            chain.doFilter(request, response)
+    }
+
+    private def findHttpMethodClosure(request) {
         def method = request.method.toLowerCase()
         switch (method) {
             case 'get':
@@ -125,16 +147,14 @@ class GraffiasFilter implements Filter {
         }
     }
 
-    private def findClosure(request, spec) {
+    private def findClosure(request, mapping) {
         def uri = request.requestURI - request.contextPath
-        for (path in spec.keySet()) {
-            switch (path) {
+        for (route in mapping.keySet()) {
+            switch (route) {
                 case String:
-                    if (path == uri)
-                        return spec[path]
+                    if (route == uri)
+                        return mapping[route]
                     break
-                default:
-                    return null
             }
         }
     }
@@ -156,4 +176,33 @@ class GraffiasFilter implements Filter {
 
     void init(FilterConfig filterConfig) {}
     void destroy() {}
+}
+
+class WebSocketDSL {
+    static def websocket(HttpServletRequest request, String protocol, Closure closure) {
+        def dsl = new WebSocketDSL()
+        def clonedClosure = closure.clone()
+        clonedClosure.delegate = dsl
+        clonedClosure.resolveStrategy = Closure.DELEGATE_FIRST
+        clonedClosure(request, protocol)
+        return [
+            onOpen: { WebSocket.Connection connection -> dsl.onopen(connection) },
+            onClose: { int closeCode, String message -> dsl.onclose(closeCode, message) },
+            onMessage: { String data -> dsl.onmessage(data) }
+        ] as WebSocket.OnTextMessage
+    }
+
+    def onopen, onclose, onmessage
+
+    def onopen(Closure onopen) {
+        this.onopen = onopen
+    }
+
+    def onclose(Closure onclose) {
+        this.onclose = onclose
+    }
+
+    def onmessage(Closure onmessage) {
+        this.onmessage = onmessage
+    }
 }

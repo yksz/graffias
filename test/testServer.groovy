@@ -41,12 +41,12 @@ get('/gsp') {
 
 error(404, view('404.html'))
 
-websocket('/websocket') { protocol ->
+websocket('/websocket') { req, protocol ->
     def connection
     onopen { conn ->
         connection = conn
     }
-    onclose { code ->
+    onclose { code, msg ->
         if (connection)
             connection.close()
     }
