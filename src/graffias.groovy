@@ -152,11 +152,22 @@ class GraffiasFilter implements Filter {
         for (route in mapping.keySet()) {
             switch (route) {
                 case String:
-                    if (route == uri)
+                    if (route == uri || matchesWildcard(route, uri, request))
                         return mapping[route]
                     break
             }
         }
+    }
+
+    private def matchesWildcard(route, uri, request) {
+        if (!route.endsWith('/*'))
+            return false
+        def index = route.size() - '/*'.size()
+        def prefix = route[0..<index]
+        def matched = uri.startsWith(prefix)
+        if (matched)
+            request.metaClass.getPathInfo = { request.requestURI - prefix }
+        return matched
     }
 
     private def invoke(closure, request, response) {
