@@ -60,17 +60,6 @@ static def runServer(int port = 8080, String contextPath = '/') {
     server.start()
 }
 
-protected static def defineExpandedMethods() {
-    def setAttributesMethod = {
-        setAttributes { Map<String, Object> attrs ->
-            for (attr in attrs)
-                delegate.setAttribute(attr.key, attr.value)
-        }
-    }
-    HttpServletRequest.metaClass.define(setAttributesMethod)
-    HttpSession.metaClass.define(setAttributesMethod)
-}
-
 class WebServer {
     static {
         System.setProperty('groovy.source.encoding', 'UTF-8')
@@ -112,6 +101,17 @@ class WebServer {
     }
 }
 
+protected static def defineExpandedMethods() {
+    def setAttributesMethod = {
+        setAttributes { Map<String, Object> attrs ->
+            for (attr in attrs)
+                delegate.setAttribute(attr.key, attr.value)
+        }
+    }
+    HttpServletRequest.metaClass.define(setAttributesMethod)
+    HttpSession.metaClass.define(setAttributesMethod)
+}
+
 class GraffiasFilter implements Filter {
     void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
         filter(request, response)
@@ -150,24 +150,15 @@ class GraffiasFilter implements Filter {
     private def findClosure(request, mapping) {
         def uri = request.requestURI - request.contextPath
         for (route in mapping.keySet()) {
-            switch (route) {
-                case String:
-                    if (route == uri || matchesWildcard(route, uri, request))
-                        return mapping[route]
-                    break
-            }
+            if (route == uri
+                    || graffias.matchesWildcard(route, uri) { asterisk ->
+                        request.metaClass.getPathInfo = { "/${asterisk}" }
+                    }
+                    || graffias.matchesNamedParameters(route, uri) { params ->
+                        request.setAttributes(params)
+                    })
+                return mapping[route]
         }
-    }
-
-    private def matchesWildcard(route, uri, request) {
-        if (!route.endsWith('/*'))
-            return false
-        def index = route.size() - '/*'.size()
-        def prefix = route[0..<index]
-        def matched = uri.startsWith(prefix)
-        if (matched)
-            request.metaClass.getPathInfo = { request.requestURI - prefix }
-        return matched
     }
 
     private def invoke(closure, request, response) {
@@ -189,13 +180,40 @@ class GraffiasFilter implements Filter {
     void destroy() {}
 }
 
+private static def matchesWildcard(path, uri, closure) {
+    if (!path.endsWith('/*'))
+        return false
+    def matched = uri.startsWith(path[0..<-1])
+    if (matched)
+        closure(uri.substring(path.size() - 1))
+    return matched
+}
+
+private static def matchesNamedParameters(path, uri, closure) {
+    if (path.indexOf(':') == -1)
+        return false
+    def pathParts = path.split('/')
+    def uriParts = uri.split('/')
+    if (pathParts.size() != uriParts.size())
+        return false
+    def params = [:]
+    for (i in 0..<pathParts.size()) {
+        if (!pathParts[i].isEmpty() && pathParts[i].charAt(0) == ':')
+            params[pathParts[i].substring(1)] = uriParts[i]
+        else if (pathParts[i] != uriParts[i])
+            return false
+    }
+    closure(params)
+    return true
+}
+
 class WebSocketDSL {
     static def websocket(HttpServletRequest request, String protocol, Closure closure) {
         def dsl = new WebSocketDSL()
-        def clonedClosure = closure.clone()
-        clonedClosure.delegate = dsl
-        clonedClosure.resolveStrategy = Closure.DELEGATE_FIRST
-        clonedClosure(request, protocol)
+        closure = closure.clone()
+        closure.delegate = dsl
+        closure.resolveStrategy = Closure.DELEGATE_FIRST
+        closure(request, protocol)
         return [
             onOpen: { WebSocket.Connection connection -> dsl.onopen(connection) },
             onClose: { int closeCode, String message -> dsl.onclose(closeCode, message) },
