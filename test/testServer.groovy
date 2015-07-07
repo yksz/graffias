@@ -22,6 +22,11 @@ get('/wildcard/*') { req ->
     "path=${req.pathInfo}"
 }
 
+get('/:named/params') { req ->
+    setContentType 'text/plain'
+    "named=${req.getAttribute('named')}"
+}
+
 filter('/filter') { req ->
     req.setAttributes(filter: 'on')
 }

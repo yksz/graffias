@@ -29,7 +29,7 @@ class GraffiasTest extends GroovyTestCase {
         }
     }
 
-    void testPost_Parameter() {
+    void testPost_RequestParameters() {
         http.post(path: '/', query: [key:'value']) { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'key=value'
@@ -40,6 +40,13 @@ class GraffiasTest extends GroovyTestCase {
         http.get(path: '/wildcard/foobar') { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'path=/foobar'
+        }
+    }
+
+    void testGet_NamedParameters() {
+        http.get(path: '/foobar/params') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'named=foobar'
         }
     }
 
