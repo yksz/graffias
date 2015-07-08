@@ -3,7 +3,9 @@
     @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.13.v20130916'),
     @Grab('javax.servlet:javax.servlet-api:3.0.1')
 ])
+import org.eclipse.jetty.http.ssl.SslContextFactory
 import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.server.ssl.SslSelectChannelConnector
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
 import org.eclipse.jetty.websocket.*
@@ -55,9 +57,9 @@ static def view(String path) {
     "/WEB-INF/views/${path}".toURI()
 }
 
-static def runServer(int port = 8080, String contextPath = '/') {
-    def server = new WebServer(port, contextPath)
-    server.start()
+static def runServer(int port = 8080, String contextPath = '/', Map<String, String> ssl = [:]) {
+    def webServer = new WebServer(port, contextPath, ssl)
+    webServer.start()
 }
 
 class WebServer {
@@ -68,8 +70,8 @@ class WebServer {
 
     def jetty, webapp
 
-    WebServer(int port, String contextPath) {
-        jetty = new Server(port)
+    WebServer(int port, String contextPath, Map<String, String> ssl) {
+        jetty = createServer(port, ssl)
         webapp = new WebAppContext(jetty, null, contextPath)
         webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
@@ -79,6 +81,22 @@ class WebServer {
         registerFilter(new GraffiasFilter(), '/*')
         Config.websocket.each { path, closure -> registerWebSocket(path, closure) }
         Config.error.each { status, uri -> webapp.errorHandler.addErrorPage(status, uri) }
+    }
+
+    private def createServer(port, ssl) {
+        if (ssl) {
+            def server = new Server()
+            def sslContextFactory = new SslContextFactory()
+            ssl.each { method, value ->
+                sslContextFactory."set${method.capitalize()}"(value)
+            }
+            def sslConnector = new SslSelectChannelConnector(sslContextFactory)
+            sslConnector.port = port
+            server.addConnector(sslConnector)
+            return server
+        } else {
+            return new Server(port)
+        }
     }
 
     def start() {
