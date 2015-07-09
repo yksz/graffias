@@ -3,14 +3,15 @@
     @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.13.v20130916'),
     @Grab('javax.servlet:javax.servlet-api:3.0.1')
 ])
+import java.util.regex.Pattern
+import javax.servlet.*
+import javax.servlet.http.*
 import org.eclipse.jetty.http.ssl.SslContextFactory
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ssl.SslSelectChannelConnector
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
 import org.eclipse.jetty.websocket.*
-import javax.servlet.*
-import javax.servlet.http.*
 
 class Config {
     static def get = [:], post = [:], put = [:], delete = [:]
@@ -21,20 +22,40 @@ static def get(String path, Closure closure) {
     register('get', path, closure)
 }
 
+static def get(Pattern pattern, Closure closure) {
+    register('get', pattern, closure)
+}
+
 static def post(String path, Closure closure) {
     register('post', path, closure)
+}
+
+static def post(Pattern pattern, Closure closure) {
+    register('post', pattern, closure)
 }
 
 static def put(String path, Closure closure) {
     register('put', path, closure)
 }
 
+static def put(Pattern pattern, Closure closure) {
+    register('put', pattern, closure)
+}
+
 static def delete(String path, Closure closure) {
     register('delete', path, closure)
 }
 
+static def delete(Pattern pattern, Closure closure) {
+    register('delete', pattern, closure)
+}
+
 static def filter(String path, Closure closure) {
     register('filter', path, closure)
+}
+
+static def filter(Pattern pattern, Closure closure) {
+    register('filter', pattern, closure)
 }
 
 static def websocket(String path, Closure closure) {
@@ -137,9 +158,9 @@ class GraffiasFilter implements Filter {
     }
 
     private def filter(request, response) {
-        def closure = findClosure(request, Config.filter)
+        def (closure, matcher) = findClosure(request, Config.filter)
         if (closure)
-            invoke(closure, request, response)
+            invoke(closure, matcher, request, response)
     }
 
     private def doMainProcess(request, response, chain) {
@@ -147,9 +168,9 @@ class GraffiasFilter implements Filter {
             chain.doFilter(request, response)
             return
         }
-        def closure = findHttpMethodClosure(request)
+        def (closure, matcher) = findHttpMethodClosure(request)
         if (closure)
-            invoke(closure, request, response)
+            invoke(closure, matcher, request, response)
         else
             chain.doFilter(request, response)
     }
@@ -162,26 +183,40 @@ class GraffiasFilter implements Filter {
             case 'put':
             case 'delete':
                 return findClosure(request, Config[method])
+            default:
+                return [null, null]
         }
     }
 
     private def findClosure(request, mapping) {
         def uri = request.requestURI - request.contextPath
         for (route in mapping.keySet()) {
-            if (route == uri
-                    || graffias.matchesWildcard(route, uri) { asterisk ->
-                        request.metaClass.getPathInfo = { "/${asterisk}" }
-                    }
-                    || graffias.matchesNamedParameters(route, uri) { params ->
-                        request.setAttributes(params)
-                    })
-                return mapping[route]
+            switch (route) {
+                case String:
+                    if (route == uri
+                            || graffias.matchesWildcard(route, uri) { asterisk ->
+                                request.metaClass.getPathInfo = { "/${asterisk}" }
+                            }
+                            || graffias.matchesNamedParameters(route, uri) { params ->
+                                request.setAttributes(params)
+                            })
+                        return [mapping[route], null]
+                    break
+                case Pattern:
+                    def matcher = route.matcher(uri)
+                    if (matcher.matches())
+                        return [mapping[route], matcher]
+                    break
+                default:
+                    throw new AssertionError("This type is not supported: ${route.class.name}")
+            }
         }
+        return [null, null]
     }
 
-    private def invoke(closure, request, response) {
+    private def invoke(closure, matcher, request, response) {
         closure.delegate = response
-        def result = closure(request)
+        def result = (matcher == null) ? closure(request) : closure(request, matcher)
         switch (result) {
             case String:
             case GString:

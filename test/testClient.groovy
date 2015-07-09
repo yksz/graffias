@@ -37,16 +37,23 @@ class GraffiasTest extends GroovyTestCase {
     }
 
     void testGet_WildcardPath() {
-        http.get(path: '/wildcard/foobar') { resp, reader ->
+        http.get(path: '/wildcard/foo') { resp, reader ->
             assert resp.contentType == 'text/plain'
-            assert reader.text == 'path=/foobar'
+            assert reader.text == 'path=/foo'
         }
     }
 
     void testGet_NamedParameters() {
-        http.get(path: '/foobar/params') { resp, reader ->
+        http.get(path: '/foo/params') { resp, reader ->
             assert resp.contentType == 'text/plain'
-            assert reader.text == 'named=foobar'
+            assert reader.text == 'name=foo'
+        }
+    }
+
+    void testGet_Pattern() {
+        http.get(path: '/pattern/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
         }
     }
 
@@ -54,6 +61,27 @@ class GraffiasTest extends GroovyTestCase {
         http.get(path: '/filter') { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'filter=on'
+        }
+    }
+
+    void testFilter_Wildcard() {
+        http.get(path: '/filter/wildcard/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'path=/foo'
+        }
+    }
+
+    void testFilter_NamedParameters() {
+        http.get(path: '/filter/foo/params') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
+        }
+    }
+
+    void testFilter_Pattern() {
+        http.get(path: '/filter/pattern/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
         }
     }
 

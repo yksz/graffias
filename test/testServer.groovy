@@ -22,9 +22,14 @@ get('/wildcard/*') { req ->
     "path=${req.pathInfo}"
 }
 
-get('/:named/params') { req ->
+get('/:name/params') { req ->
     setContentType 'text/plain'
-    "named=${req.getAttribute('named')}"
+    "name=${req.getAttribute('name')}"
+}
+
+get(~/^\/pattern\/(?<name>.+)/) { req, m ->
+    setContentType 'text/plain'
+    "name=${m.group('name')}"
 }
 
 filter('/filter') { req ->
@@ -34,6 +39,24 @@ filter('/filter') { req ->
 get('/filter') { req ->
     setContentType 'text/plain'
     "filter=${req.getAttribute('filter')}"
+}
+
+filter('/filter/wildcard/*') { req ->
+    setContentType 'text/plain'
+    "path=${req.pathInfo}"
+}
+
+filter('/filter/:name/params') { req ->
+    setContentType 'text/plain'
+    "name=${req.getAttribute('name')}"
+}
+
+filter(~/^\/filter\/pattern\/(?<name>.+)/) { req, m ->
+    setContentType 'text/plain'
+    "name=${m.group('name')}"
+}
+
+get('/filter/*') { req ->
 }
 
 get('/groovy') {
