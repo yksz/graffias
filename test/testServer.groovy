@@ -19,7 +19,7 @@ post('/') { req ->
 
 get('/wildcard/*') { req ->
     setContentType 'text/plain'
-    "path=${req.pathInfo}"
+    "servletPath=${req.servletPath}, pathInfo=${req.pathInfo}"
 }
 
 get('/:name/params') { req ->
@@ -43,7 +43,7 @@ get('/filter') { req ->
 
 filter('/filter/wildcard/*') { req ->
     setContentType 'text/plain'
-    "path=${req.pathInfo}"
+    "servletPath=${req.servletPath}, pathInfo=${req.pathInfo}"
 }
 
 filter('/filter/:name/params') { req ->

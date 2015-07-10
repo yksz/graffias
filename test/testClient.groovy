@@ -36,10 +36,17 @@ class GraffiasTest extends GroovyTestCase {
         }
     }
 
-    void testGet_WildcardPath() {
+    void testGet_WildcardPath01() {
         http.get(path: '/wildcard/foo') { resp, reader ->
             assert resp.contentType == 'text/plain'
-            assert reader.text == 'path=/foo'
+            assert reader.text == 'servletPath=/wildcard, pathInfo=/foo'
+        }
+    }
+
+    void testGet_WildcardPath02() {
+        http.get(path: '/wildcard') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'servletPath=/wildcard, pathInfo=null'
         }
     }
 
@@ -67,7 +74,7 @@ class GraffiasTest extends GroovyTestCase {
     void testFilter_Wildcard() {
         http.get(path: '/filter/wildcard/foo') { resp, reader ->
             assert resp.contentType == 'text/plain'
-            assert reader.text == 'path=/foo'
+            assert reader.text == 'servletPath=/filter/wildcard, pathInfo=/foo'
         }
     }
 
@@ -147,6 +154,7 @@ class GraffiasTest extends GroovyTestCase {
         try {
             connection = client.open(new URI(url), webSocket, 5, TimeUnit.SECONDS)
             connection.sendMessage(sendMessage)
+            Thread.sleep(10)
         } finally {
             connection?.close()
             factory.stop()

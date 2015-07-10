@@ -194,8 +194,9 @@ class GraffiasFilter implements Filter {
             switch (route) {
                 case String:
                     if (route == uri
-                            || graffias.matchesWildcard(route, uri) { asterisk ->
-                                request.metaClass.getPathInfo = { "/${asterisk}" }
+                            || graffias.matchesWildcard(route, uri) { servletPath, pathInfo ->
+                                request.metaClass.getServletPath = { servletPath }
+                                request.metaClass.getPathInfo = { pathInfo }
                             }
                             || graffias.matchesNamedParameters(route, uri) { params ->
                                 request.setAttributes(params)
@@ -236,9 +237,12 @@ class GraffiasFilter implements Filter {
 private static def matchesWildcard(path, uri, closure) {
     if (!path.endsWith('/*'))
         return false
-    def matched = uri.startsWith(path[0..<-1])
-    if (matched)
-        closure(uri.substring(path.size() - 1))
+    def matched = "${uri}/".startsWith(path[0..<-1])
+    if (matched) {
+        def servletPath = path[0..<-'/*'.size()]
+        def pathInfo = (uri - servletPath) ?: null
+        closure(servletPath, pathInfo)
+    }
     return matched
 }
 
