@@ -19,7 +19,17 @@ post('/') { req ->
 
 get('/wildcard/*') { req ->
     setContentType 'text/plain'
-    "path=${req.pathInfo}"
+    "servletPath=${req.servletPath}, pathInfo=${req.pathInfo}"
+}
+
+get('/:name/params') { req ->
+    setContentType 'text/plain'
+    "name=${req.getAttribute('name')}"
+}
+
+get(~/^\/pattern\/(?<name>.+)/) { req, m ->
+    setContentType 'text/plain'
+    "name=${m.group('name')}"
 }
 
 filter('/filter') { req ->
@@ -29,6 +39,24 @@ filter('/filter') { req ->
 get('/filter') { req ->
     setContentType 'text/plain'
     "filter=${req.getAttribute('filter')}"
+}
+
+filter('/filter/wildcard/*') { req ->
+    setContentType 'text/plain'
+    "servletPath=${req.servletPath}, pathInfo=${req.pathInfo}"
+}
+
+filter('/filter/:name/params') { req ->
+    setContentType 'text/plain'
+    "name=${req.getAttribute('name')}"
+}
+
+filter(~/^\/filter\/pattern\/(?<name>.+)/) { req, m ->
+    setContentType 'text/plain'
+    "name=${m.group('name')}"
+}
+
+get('/filter/*') { req ->
 }
 
 get('/groovy') {
@@ -41,12 +69,12 @@ get('/gsp') {
 
 error(404, view('404.html'))
 
-websocket('/websocket') { protocol ->
+websocket('/websocket') { req, protocol ->
     def connection
     onopen { conn ->
         connection = conn
     }
-    onclose { code ->
+    onclose { code, msg ->
         if (connection)
             connection.close()
     }

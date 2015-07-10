@@ -3,48 +3,71 @@
     @Grab('org.eclipse.jetty.aggregate:jetty-webapp:8.1.13.v20130916'),
     @Grab('javax.servlet:javax.servlet-api:3.0.1')
 ])
+import java.util.regex.Pattern
+import javax.servlet.*
+import javax.servlet.http.*
+import org.eclipse.jetty.http.ssl.SslContextFactory
 import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.server.ssl.SslSelectChannelConnector
 import org.eclipse.jetty.servlet.*
 import org.eclipse.jetty.webapp.WebAppContext
 import org.eclipse.jetty.websocket.*
-import org.eclipse.jetty.websocket.WebSocket.Connection
-import javax.servlet.*
-import javax.servlet.http.*
 
 class Config {
-    static def mappings = [], errors = []
+    static def get = [:], post = [:], put = [:], delete = [:]
+    static def filter = [:], websocket = [:], error = [:]
 }
 
 static def get(String path, Closure closure) {
     register('get', path, closure)
 }
 
+static def get(Pattern pattern, Closure closure) {
+    register('get', pattern, closure)
+}
+
 static def post(String path, Closure closure) {
     register('post', path, closure)
+}
+
+static def post(Pattern pattern, Closure closure) {
+    register('post', pattern, closure)
 }
 
 static def put(String path, Closure closure) {
     register('put', path, closure)
 }
 
+static def put(Pattern pattern, Closure closure) {
+    register('put', pattern, closure)
+}
+
 static def delete(String path, Closure closure) {
     register('delete', path, closure)
+}
+
+static def delete(Pattern pattern, Closure closure) {
+    register('delete', pattern, closure)
 }
 
 static def filter(String path, Closure closure) {
     register('filter', path, closure)
 }
 
+static def filter(Pattern pattern, Closure closure) {
+    register('filter', pattern, closure)
+}
+
 static def websocket(String path, Closure closure) {
     register('websocket', path, closure)
 }
 
-private static def register(method, path, closure) {
-    Config.mappings << [method: method, path: path, closure: closure]
+private static def register(method, route, closure) {
+    Config[method] << [(route): closure]
 }
 
 static def error(int status, URI uri) {
-    Config.errors << [status: status, uri: uri.toString()]
+    Config.error << [(status): uri.toString()]
 }
 
 static def uri(String path) {
@@ -55,39 +78,46 @@ static def view(String path) {
     "/WEB-INF/views/${path}".toURI()
 }
 
-static def runServer(int port = 8080, String contextPath = '/') {
-    new WebServer(port, contextPath, Config.mappings, Config.errors).start()
-}
-
-private static expandMethod() {
-    def setAttributesMethod = {
-        setAttributes { Map<String, Object> attrs ->
-            attrs.each { key, value ->
-                delegate.setAttribute(key, value)
-            }
-        }
-    }
-    HttpServletRequest.metaClass.define(setAttributesMethod)
-    HttpSession.metaClass.define(setAttributesMethod)
+static def runServer(int port = 8080, String contextPath = '/', Map<String, String> ssl = [:]) {
+    def webServer = new WebServer(port, contextPath, ssl)
+    webServer.start()
 }
 
 class WebServer {
     static {
-        System.setProperty('groovy.source.encoding', 'utf-8')
-        graffias.expandMethod()
+        System.setProperty('groovy.source.encoding', 'UTF-8')
+        graffias.defineExpandedMethods()
     }
 
-    def jetty, webapp, servlets = [:]
+    def jetty, webapp
 
-    WebServer(int port, String contextPath, List<Map> mappings, List<Map> errors) {
-        jetty = new Server(port)
+    WebServer(int port, String contextPath, Map<String, String> ssl) {
+        jetty = createServer(port, ssl)
         webapp = new WebAppContext(jetty, null, contextPath)
         webapp.resourceBase = 'public'
         webapp.setInitParameter('org.eclipse.jetty.servlet.Default.dirAllowed', 'false')
+        webapp.start() // load web.xml
         webapp.addServlet(groovy.servlet.GroovyServlet, '*.groovy')
         webapp.addServlet(groovy.servlet.TemplateServlet, '*.gsp')
-        mappings.each { registerMapping(it) }
-        errors.each { registerErrorPage(it) }
+        registerFilter(new GraffiasFilter(), '/*')
+        Config.websocket.each { path, closure -> registerWebSocket(path, closure) }
+        Config.error.each { status, uri -> webapp.errorHandler.addErrorPage(status, uri) }
+    }
+
+    private def createServer(port, ssl) {
+        if (ssl) {
+            def server = new Server()
+            def sslContextFactory = new SslContextFactory()
+            ssl.each { method, value ->
+                sslContextFactory."set${method.capitalize()}"(value)
+            }
+            def sslConnector = new SslSelectChannelConnector(sslContextFactory)
+            sslConnector.port = port
+            server.addConnector(sslConnector)
+            return server
+        } else {
+            return new Server(port)
+        }
     }
 
     def start() {
@@ -95,115 +125,155 @@ class WebServer {
         jetty.join()
     }
 
-    private def registerMapping(mapping) {
-        if (mapping.path == '/')
-            mapping.path = ''
-        if (mapping.method == 'filter')
-            registerFilter(mapping)
-        else if (mapping.method == 'websocket')
-            registerWebSocket(mapping)
-        else
-            registerServlet(mapping)
-    }
-
-    private def registerServlet(mapping) {
-        def servlet = servlets[mapping.path]
-        if (!servlet) {
-            servlet = new GraffiasServlet()
-            servlets[mapping.path] = servlet
-        }
-        servlet[mapping.method] = mapping.closure
-        webapp.addServlet(new ServletHolder(servlet), mapping.path)
-    }
-
-    private def registerFilter(mapping) {
-        def filter = new GraffiasFilter(closure: mapping.closure)
+    private def registerFilter(filter, path) {
         def dispatches = EnumSet.of(DispatcherType.REQUEST)
-        webapp.addFilter(new FilterHolder(filter), mapping.path, dispatches)
+        webapp.addFilter(new FilterHolder(filter), path, dispatches)
     }
 
-    private def registerWebSocket(mapping) {
+    private def registerWebSocket(path, closure) {
         def servlet = [
             doWebSocketConnect: { HttpServletRequest request, String protocol ->
-                WebSocketDSL.websocket(protocol, mapping.closure)
+                return WebSocketDSL.websocket(request, protocol, closure)
             }
         ] as WebSocketServlet
-        webapp.addServlet(new ServletHolder(servlet), mapping.path)
-    }
-
-    private def registerErrorPage(error) {
-        webapp.errorHandler.addErrorPage(error.status, error.uri)
+        webapp.addServlet(new ServletHolder(servlet), path)
     }
 }
 
-class GraffiasServlet extends HttpServlet {
-    def get, post, put, delete
+protected static def defineExpandedMethods() {
+    def setAttributesMethod = {
+        setAttributes { Map<String, Object> attrs ->
+            for (attr in attrs)
+                delegate.setAttribute(attr.key, attr.value)
+        }
+    }
+    HttpServletRequest.metaClass.define(setAttributesMethod)
+    HttpSession.metaClass.define(setAttributesMethod)
+}
 
-    void doGet(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, get)
+class GraffiasFilter implements Filter {
+    void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+        filter(request, response)
+        doMainProcess(request, response, chain)
     }
 
-    void doPost(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, post)
+    private def filter(request, response) {
+        def (closure, matcher) = findClosure(request, Config.filter)
+        if (closure)
+            invoke(closure, matcher, request, response)
     }
 
-    void doPut(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, put)
-    }
-
-    void doDelete(HttpServletRequest request, HttpServletResponse response) {
-        execute(request, response, delete)
-    }
-
-    private def execute(request, response, closure) {
-        if (!closure) {
-            response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED)
+    private def doMainProcess(request, response, chain) {
+        if ('websocket'.equalsIgnoreCase(request.getHeader('Upgrade'))) {
+            chain.doFilter(request, response)
             return
         }
+        def (closure, matcher) = findHttpMethodClosure(request)
+        if (closure)
+            invoke(closure, matcher, request, response)
+        else
+            chain.doFilter(request, response)
+    }
+
+    private def findHttpMethodClosure(request) {
+        def method = request.method.toLowerCase()
+        switch (method) {
+            case 'get':
+            case 'post':
+            case 'put':
+            case 'delete':
+                return findClosure(request, Config[method])
+            default:
+                return [null, null]
+        }
+    }
+
+    private def findClosure(request, mapping) {
+        def uri = request.requestURI - request.contextPath
+        for (route in mapping.keySet()) {
+            switch (route) {
+                case String:
+                    if (route == uri
+                            || graffias.matchesWildcard(route, uri) { servletPath, pathInfo ->
+                                request.metaClass.getServletPath = { servletPath }
+                                request.metaClass.getPathInfo = { pathInfo }
+                            }
+                            || graffias.matchesNamedParameters(route, uri) { params ->
+                                request.setAttributes(params)
+                            })
+                        return [mapping[route], null]
+                    break
+                case Pattern:
+                    def matcher = route.matcher(uri)
+                    if (matcher.matches())
+                        return [mapping[route], matcher]
+                    break
+                default:
+                    throw new AssertionError("This type is not supported: ${route.class.name}")
+            }
+        }
+        return [null, null]
+    }
+
+    private def invoke(closure, matcher, request, response) {
         closure.delegate = response
-        def result = closure(request)
+        def result = (matcher == null) ? closure(request) : closure(request, matcher)
         switch (result) {
             case String:
             case GString:
                 response.writer.write(result.toString())
                 break
             case URI:
-                def dispatcher
-                if (result.toString() == request.requestURI - request.contextPath)
-                    dispatcher = servletContext.getNamedDispatcher('default')
-                else
-                    dispatcher = request.getRequestDispatcher(result.toString())
+                def dispatcher = request.getRequestDispatcher(result.toString())
                 dispatcher.forward(request, response)
                 break
         }
-    }
-}
-
-class GraffiasFilter implements Filter {
-    def closure
-
-    void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
-        if (closure) {
-            closure.delegate = response
-            closure(request)
-        }
-        chain.doFilter(request, response)
     }
 
     void init(FilterConfig filterConfig) {}
     void destroy() {}
 }
 
+private static def matchesWildcard(path, uri, closure) {
+    if (!path.endsWith('/*'))
+        return false
+    def matched = "${uri}/".startsWith(path[0..<-1])
+    if (matched) {
+        def servletPath = path[0..<-'/*'.size()]
+        def pathInfo = (uri - servletPath) ?: null
+        closure(servletPath, pathInfo)
+    }
+    return matched
+}
+
+private static def matchesNamedParameters(path, uri, closure) {
+    if (path.indexOf(':') == -1)
+        return false
+    def pathParts = path.split('/')
+    def uriParts = uri.split('/')
+    if (pathParts.size() != uriParts.size())
+        return false
+    def params = [:]
+    for (i in 0..<pathParts.size()) {
+        if (!pathParts[i].isEmpty() && pathParts[i].charAt(0) == ':')
+            params[pathParts[i].substring(1)] = uriParts[i]
+        else if (pathParts[i] != uriParts[i])
+            return false
+    }
+    closure(params)
+    return true
+}
+
 class WebSocketDSL {
-    static def websocket(String protocol, Closure closure) {
+    static def websocket(HttpServletRequest request, String protocol, Closure closure) {
         def dsl = new WebSocketDSL()
-        def c = closure.clone()
-        c.delegate = dsl
-        c.resolveStrategy = Closure.DELEGATE_FIRST
-        c(protocol)
-        [
-            onOpen: { Connection connection -> dsl.onopen(connection) },
-            onClose: { int closeCode, String message -> dsl.onclose(closeCode) },
+        closure = closure.clone()
+        closure.delegate = dsl
+        closure.resolveStrategy = Closure.DELEGATE_FIRST
+        closure(request, protocol)
+        return [
+            onOpen: { WebSocket.Connection connection -> dsl.onopen(connection) },
+            onClose: { int closeCode, String message -> dsl.onclose(closeCode, message) },
             onMessage: { String data -> dsl.onmessage(data) }
         ] as WebSocket.OnTextMessage
     }

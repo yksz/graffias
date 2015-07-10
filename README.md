@@ -6,7 +6,7 @@ Graffias is a lightweight and micro web framework for Groovy inspired by
 and Sinatra.
 
 Graffias is distributed as a single file,
-and it's source code is only about 200 lines.  
+and it's source code is only about 300 lines.  
 So, please customize it freely!
 
 Example
@@ -23,42 +23,63 @@ runServer()
 ```
 
 ```groovy
+@Grab(group='commons-lang', module='commons-lang', version='2.6')
 import static graffias.*
+import org.apache.commons.lang.StringEscapeUtils
 
 get('/') {
-    uri 'index.html'
+    uri 'index.html' // public/index.html
 }
 
-post('/') { req ->
+post('/') { req -> // req => javax.servlet.http.HttpServletRequest
+    setContentType 'text/plain'
     "${req.parameterMap}"
 }
 
 get('/hello') { req ->
-    setContentType 'text/html'
-    setStatus 200
+    setContentType 'text/html' // HttpServletResponse.setContentType()
+    setStatus 200 // HttpServletResponse.setStatus()
     """
     <html><body>
     <h1>
-    Hello World!
-    (filter = ${req.getAttribute('filter')})
+    Hello World (filter=${req.getAttribute('filter')})
     </h1>
     </body></html>
     """
 }
 
-filter('/hello') { req ->
-    req.setAttributes(filter: 'on')
+get('/hello/:name') { req ->
+    setContentType 'text/plain'
+    "Hello ${req.getAttribute('name')} (filter=${req.getAttribute('filter')})"
 }
 
-get('/gsp/*') {
-    view 'hello.gsp'
+filter('/hello/*') { req ->
+    req.setAttributes(filter: 'on') // an expanded method
+}
+
+get(~/^\/goodbye\/(?<name>.+)/) { req, m -> // m => java.util.regex.Matcher
+    setContentType 'text/plain'
+    "Goodbye ${m.group('name')}"
+}
+
+get('/security') { req ->
+    setContentType 'text/html'
+    StringEscapeUtils.escapeHtml("${req.parameterMap}") // XSS prevention
+}
+
+get('/groovy') {
+    view 'hello.groovy' // public/WEB-INF/views/hello.groovy
+}
+
+get('/gsp') {
+    view 'hello.gsp' // public/WEB-INF/views/hello.gsp
 }
 
 get('/redirect') {
-    sendRedirect '/'
+    sendRedirect '/' // HttpServletResponse.sendRedirect()
 }
 
-error(404, view('404.html'))
+error(404, view('404.html')) // public/WEB-INF/views/404.html
 
 runServer(8080, '/')
 ```
@@ -69,12 +90,12 @@ Example - WebSocket
 ```groovy
 import static graffias.*
 
-websocket('/') { protocol ->
+websocket('/') { req, protocol ->
     def connection
     onopen { conn ->
         connection = conn
     }
-    onclose { code ->
+    onclose { code, msg ->
         if (connection)
             connection.close()
     }

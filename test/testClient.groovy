@@ -29,17 +29,38 @@ class GraffiasTest extends GroovyTestCase {
         }
     }
 
-    void testPost_Parameter() {
+    void testPost_RequestParameters() {
         http.post(path: '/', query: [key:'value']) { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'key=value'
         }
     }
 
-    void testGet_WildcardPath() {
-        http.get(path: '/wildcard/foobar') { resp, reader ->
+    void testGet_WildcardPath01() {
+        http.get(path: '/wildcard/foo') { resp, reader ->
             assert resp.contentType == 'text/plain'
-            assert reader.text == 'path=/foobar'
+            assert reader.text == 'servletPath=/wildcard, pathInfo=/foo'
+        }
+    }
+
+    void testGet_WildcardPath02() {
+        http.get(path: '/wildcard') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'servletPath=/wildcard, pathInfo=null'
+        }
+    }
+
+    void testGet_NamedParameters() {
+        http.get(path: '/foo/params') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
+        }
+    }
+
+    void testGet_Pattern() {
+        http.get(path: '/pattern/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
         }
     }
 
@@ -47,6 +68,27 @@ class GraffiasTest extends GroovyTestCase {
         http.get(path: '/filter') { resp, reader ->
             assert resp.contentType == 'text/plain'
             assert reader.text == 'filter=on'
+        }
+    }
+
+    void testFilter_Wildcard() {
+        http.get(path: '/filter/wildcard/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'servletPath=/filter/wildcard, pathInfo=/foo'
+        }
+    }
+
+    void testFilter_NamedParameters() {
+        http.get(path: '/filter/foo/params') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
+        }
+    }
+
+    void testFilter_Pattern() {
+        http.get(path: '/filter/pattern/foo') { resp, reader ->
+            assert resp.contentType == 'text/plain'
+            assert reader.text == 'name=foo'
         }
     }
 
@@ -112,6 +154,7 @@ class GraffiasTest extends GroovyTestCase {
         try {
             connection = client.open(new URI(url), webSocket, 5, TimeUnit.SECONDS)
             connection.sendMessage(sendMessage)
+            Thread.sleep(10)
         } finally {
             connection?.close()
             factory.stop()
