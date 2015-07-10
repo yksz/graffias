@@ -6,9 +6,9 @@ get('/') {
     uri 'index.html' // public/index.html
 }
 
-post('/') { req ->
+post('/') { req -> // req => javax.servlet.http.HttpServletRequest
     setContentType 'text/plain'
-    "${req.parameterMap}" // HttpServletRequest.getParameterMap()
+    "${req.parameterMap}"
 }
 
 get('/hello') { req ->
@@ -17,15 +17,24 @@ get('/hello') { req ->
     """
     <html><body>
     <h1>
-    Hello World!
-    (filter = ${req.getAttribute('filter')})
+    Hello World (filter=${req.getAttribute('filter')})
     </h1>
     </body></html>
     """
 }
 
-filter('/hello') { req ->
+get('/hello/:name') { req ->
+    setContentType 'text/plain'
+    "Hello ${req.getAttribute('name')} (filter=${req.getAttribute('filter')})"
+}
+
+filter('/hello/*') { req ->
     req.setAttributes(filter: 'on') // an expanded method
+}
+
+get(~/^\/goodbye\/(?<name>.+)/) { req, m -> // m => java.util.regex.Matcher
+    setContentType 'text/plain'
+    "Goodbye ${m.group('name')}"
 }
 
 get('/security') { req ->
@@ -33,11 +42,11 @@ get('/security') { req ->
     StringEscapeUtils.escapeHtml("${req.parameterMap}") // XSS prevention
 }
 
-get('/groovy/*') {
+get('/groovy') {
     view 'hello.groovy' // public/WEB-INF/views/hello.groovy
 }
 
-get('/gsp/*') {
+get('/gsp') {
     view 'hello.gsp' // public/WEB-INF/views/hello.gsp
 }
 

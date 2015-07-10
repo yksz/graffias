@@ -1,11 +1,11 @@
 import static graffias.*
 
-websocket('/') { protocol ->
+websocket('/') { req, protocol ->
     def connection
     onopen { conn ->
         connection = conn
     }
-    onclose { code ->
+    onclose { code, msg ->
         if (connection)
             connection.close()
     }

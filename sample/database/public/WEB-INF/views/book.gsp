@@ -2,7 +2,7 @@
   <head>
     <title>Book List</title>
   </head>
-<body>
+  <body>
     <h1>Book List</h1>
     <h2>
       <table border=1 width=300>

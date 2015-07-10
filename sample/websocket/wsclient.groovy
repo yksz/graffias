@@ -1,4 +1,4 @@
-@Grab(group='org.eclipse.jetty', module='jetty-websocket', version='8.1.7.v20120910')
+@Grab(group='org.eclipse.jetty', module='jetty-websocket', version='8.1.13.v20130916')
 import org.eclipse.jetty.websocket.*
 import java.util.concurrent.TimeUnit
 
@@ -19,5 +19,6 @@ def connection = client.open(new URI(url), new WebSocket.OnTextMessage() {
     }
 }).get(5, TimeUnit.SECONDS)
 connection.sendMessage("Hello World")
+Thread.sleep(10)
 connection.close()
 factory.stop()
